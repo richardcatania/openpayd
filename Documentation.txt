@@ -1,0 +1,88 @@
+Setting up the deployment in AWS using the EKS and using auto scaling Node Groups
+
+
+
+Resources:
+
+	- Docker Hub: https://hub.docker.com/r/richardcatania/openpayd
+	- Git Repository: 
+
+
+
+
+
+- VPC
+  - Create a VPC to host the infrastructure and give it a name, CIRD Block and a Region
+    - Example: 
+	  Name: Openpayd
+      CIDR Block: 172.1.0.0/16
+      Region: eu-central-1
+	  
+- Subnets
+  - Create a total of 4 subnets, 2 private and 2 public. The private ones will be tagged to be used for the worker nodes, 
+    while the public ones will be used by Kubernetes for provisioning load balancers (Kubernetes Services). The subnets should be split between availability zones, 
+	as to avoid any service interruptions should a service interruption occur in a specific zone.
+	- Example:
+	    Name: Private Subnet 1
+        CIDR Block: 172.1.1.0/24
+        Availability Zone: eu-central-1a
+        Tag: Key=kubernetes.io/role/internal-elb Value=1
+        
+		Name: Private Subnet 2
+        CIDR: 172.1.2.0/24
+        Availability Zone: eu-central-1b
+        Tag: Key=kubernetes.io/role/internal-elb Value=1
+
+		Name: Public Subnet 1
+        CIDR: 172.1.3.0/24
+        Availability Zone: eu-central-1a
+
+		Name: Public Subnet 2
+        CIDR: 172.1.4.0/24
+        Availability Zone: eu-central-1b
+	  
+- Internet Gateway
+  - Create a new Internet Gateway
+  - Attach the newly create Internet Gateway to the VPC
+  
+- Routing Table
+  - Add Route from 0.0.0.0/0 to Internet Gateway
+
+- EKS Service Role
+  - Create an IAM Role for the EKS service
+  
+- EKS Cluster
+  - Create an EKS Cluster making sure to select the VPC, Subnets and EKS Service role created earlier
+  - Example:
+    Name: Openpayd_Cluster
+	Kubernetes Version: 1.14
+	Role Name: eksServiceRole
+	VPC: xxxxxxxxxxxxx - 172.1.0.0/16
+	Subnets: 172.1.1.0/24, 172.1.2.0/24, 172.1.3.0/24, 172.1.4.0/24
+
+- EKS Node Group Role
+  - Create an IAM Node Group Role
+
+- SSH Key Pair
+  - Create an SSH Key Pair for the EC2 VMs
+
+- Node Group
+  - Create a Node Group inside the newly created EKS Cluster. Node groups provide EC2 autoscaling worker nodes for your EKS cluster
+  - Example:
+    Name: Production_Node_Group
+	Node IAM Role Name: eks-node-group-instance-role-xxxxxxxxxxxxx
+	Subnets: 172.1.1.0/24 & 172.1.2.0/24 (Private Subnets)
+	SSH Key Pair: openpayd_ssh_keypair
+	AMI Type: Amazon Linux 2 (AL2_x86_64)
+	Instance Type: t3.medium
+	Disk Size: 20GiB
+	- Group Size
+	  Minimum: 2 Nodes
+	  Maximum: 5 Nodes
+	  Desired Size: 2 Nodes
+
+- Kubernetes Deployment
+  - Install the AWS CLI locally
+  - Setup kubectl locally and connect it to your AWS subscription
+  - Deploy the pods & service by downloading the deployment.yaml file from the provided git repository, 
+    then running kubectl apply -f deployment.yaml
